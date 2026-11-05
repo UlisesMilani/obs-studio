@@ -110,7 +110,8 @@ package() {
   local commit_hash
 
   if [[ -d ${project_root}/.git ]] {
-    local git_description="$(git describe --tags --long)"
+    # Fork-specific fallback: without tags, git describe fails.
+    local git_description="$(git describe --tags --long 2>/dev/null || echo "33.0.1-proto-vst-0-g$(git rev-parse --short HEAD)")"
     commit_version="${${git_description%-*}%-*}"
     commit_hash="${git_description##*-g}"
     commit_distance="${${git_description%-*}##*-}"
