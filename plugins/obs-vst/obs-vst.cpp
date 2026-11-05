@@ -28,6 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define CLOSE_VST_TEXT obs_module_text("ClosePluginInterface")
 #define OPEN_WHEN_ACTIVE_VST_TEXT obs_module_text("OpenInterfaceWhenActive")
 
+#define PARAM_GROUP_SETTINGS "vst_params"
+#define PARAM_SETTING_PREFIX "vst_param_"
+#define PARAM_INFO_SETTINGS "vst_params_info"
+
+#define PARAMS_GROUP_TEXT obs_module_text("ParamsGroup")
+#define PARAMS_INFO_TEXT obs_module_text("ParamsInfo")
+
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("obs-vst", "en-US")
 MODULE_EXPORT const char *obs_module_description(void)
@@ -82,6 +89,57 @@ std::string getFileMD5(const char *file)
 	return std::string();
 }
 
+static std::string getParamDescription(VSTPlugin *vstPlugin, int index)
+{
+	std::string description = vstPlugin->getParamName(index);
+
+	std::string display = vstPlugin->getParamDisplay(index);
+	if (!display.empty()) {
+		std::string label = vstPlugin->getParamLabel(index);
+		description += ": " + display;
+		if (!label.empty()) {
+			description += " " + label;
+		}
+	}
+
+	return description;
+}
+
+static bool vst_param_changed(void *priv, obs_properties_t *props, obs_property_t *property, obs_data_t *settings)
+{
+	UNUSED_PARAMETER(props);
+
+	VSTPlugin *vstPlugin = (VSTPlugin *)priv;
+
+	if (!vstPlugin || !vstPlugin->vstLoaded()) {
+		return false;
+	}
+
+	int index = -1;
+	const char *name = obs_property_name(property);
+	if (sscanf(name, PARAM_SETTING_PREFIX "%d", &index) != 1) {
+		return false;
+	}
+
+	float value = 0.0f;
+	if (obs_property_get_type(property) == OBS_PROPERTY_BOOL) {
+		value = obs_data_get_bool(settings, name) ? 1.0f : 0.0f;
+	} else {
+		value = (float)obs_data_get_double(settings, name);
+	}
+
+	vstPlugin->setParamValue(index, value);
+
+	/* Keep the saved state in sync: vst_update() re-applies chunk_data
+	 * whenever the settings change, so chunk_data has to include the new
+	 * parameter values or the change would be reverted. getChunk() already
+	 * serializes either the plug-in state or all parameter values. */
+	obs_data_set_string(settings, "chunk_data", vstPlugin->getChunk().c_str());
+	obs_data_set_string(settings, "chunk_hash", getFileMD5(vstPlugin->getEffectPath().c_str()).c_str());
+
+	return false;
+}
+
 static const char *vst_name(void *unused)
 {
 	UNUSED_PARAMETER(unused);
@@ -126,6 +184,19 @@ static void vst_update(void *data, obs_data_t *settings)
 	bool chunkHashesMatch = chunkHash && *chunkHash && hash.compare(chunkHash) == 0;
 	if (chunkData && *chunkData && (chunkHashesMatch || !chunkHash || !*chunkHash)) {
 		vstPlugin->setChunk(std::string(chunkData));
+	}
+
+	/* Mirror the current parameter values into the settings so the
+	 * parameter widgets reflect the actual plug-in state. */
+	int paramCount = vstPlugin->getParamCount();
+	for (int i = 0; i < paramCount; i++) {
+		char settingName[32];
+		snprintf(settingName, sizeof(settingName), PARAM_SETTING_PREFIX "%d", i);
+		if (vstPlugin->getParamIsSwitch(i)) {
+			obs_data_set_bool(settings, settingName, vstPlugin->getParamValue(i) >= 0.5f);
+		} else {
+			obs_data_set_double(settings, settingName, vstPlugin->getParamValue(i));
+		}
 	}
 }
 
@@ -323,6 +394,35 @@ static obs_properties_t *vst_properties(void *data)
 	obs_property_set_visible(obs_properties_get(props, CLOSE_VST_SETTINGS), close_settings_vis);
 
 	obs_properties_add_bool(props, OPEN_WHEN_ACTIVE_VST_SETTINGS, OPEN_WHEN_ACTIVE_VST_TEXT);
+
+	if (data) {
+		VSTPlugin *vstPlugin = (VSTPlugin *)data;
+		if (vstPlugin->vstLoaded() && vstPlugin->getParamCount() > 0) {
+			obs_properties_t *params = obs_properties_create();
+			obs_properties_add_text(params, PARAM_INFO_SETTINGS, PARAMS_INFO_TEXT, OBS_TEXT_INFO);
+
+			int paramCount = vstPlugin->getParamCount();
+			for (int i = 0; i < paramCount; i++) {
+				char settingName[32];
+				snprintf(settingName, sizeof(settingName), PARAM_SETTING_PREFIX "%d", i);
+
+				std::string description = getParamDescription(vstPlugin, i);
+
+				obs_property_t *param;
+				if (vstPlugin->getParamIsSwitch(i)) {
+					param = obs_properties_add_bool(params, settingName,
+									vstPlugin->getParamName(i).c_str());
+				} else {
+					param = obs_properties_add_float_slider(params, settingName,
+										description.c_str(), 0.0, 1.0,
+										0.01);
+				}
+				obs_property_set_modified_callback2(param, vst_param_changed, data);
+			}
+			obs_properties_add_group(props, PARAM_GROUP_SETTINGS, PARAMS_GROUP_TEXT,
+						 OBS_GROUP_NORMAL, params);
+		}
+	}
 
 	obs_property_set_modified_callback2(list, vst_changed, data);
 
