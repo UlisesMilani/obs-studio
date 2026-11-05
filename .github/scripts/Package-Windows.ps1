@@ -44,7 +44,12 @@ function Package {
 
     Install-BuildDependencies -WingetFile "${ScriptHome}/.Wingetfile"
 
-    $GitDescription = Invoke-External git describe --tags --long
+    # Fork-specific fallback: without tags, git describe fails.
+    try {
+        $GitDescription = Invoke-External git describe --tags --long
+    } catch {
+        $GitDescription = "33.0.1-proto-vst-0-g$(git rev-parse --short HEAD)"
+    }
     $Tokens = ($GitDescription -split '-')
     $CommitVersion = $Tokens[0..$($Tokens.Count - 3)] -join '-'
     $CommitHash = $($Tokens[-1]).SubString(1)
