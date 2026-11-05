@@ -31,9 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define PARAM_GROUP_SETTINGS "vst_params"
 #define PARAM_SETTING_PREFIX "vst_param_"
 #define PARAM_INFO_SETTINGS "vst_params_info"
+#define PARAM_SNAPSHOT_SETTINGS "vst_params_snapshot"
+#define PARAM_REFRESH_SETTINGS "vst_params_refresh"
 
 #define PARAMS_GROUP_TEXT obs_module_text("ParamsGroup")
 #define PARAMS_INFO_TEXT obs_module_text("ParamsInfo")
+#define PARAMS_SNAPSHOT_TEXT obs_module_text("ParamsSnapshot")
+#define PARAMS_REFRESH_TEXT obs_module_text("ParamsRefresh")
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("obs-vst", "en-US")
@@ -138,6 +142,31 @@ static bool vst_param_changed(void *priv, obs_properties_t *props, obs_property_
 	obs_data_set_string(settings, "chunk_hash", getFileMD5(vstPlugin->getEffectPath().c_str()).c_str());
 
 	return false;
+}
+
+static std::string getParamsSnapshot(VSTPlugin *vstPlugin)
+{
+	std::string snapshot;
+	int paramCount = vstPlugin->getParamCount();
+	for (int i = 0; i < paramCount; i++) {
+		std::string description = getParamDescription(vstPlugin, i);
+		if (!snapshot.empty()) {
+			snapshot += "\n";
+		}
+		snapshot += description;
+	}
+	return snapshot;
+}
+
+static bool vst_params_refresh_clicked(obs_properties_t *props, obs_property_t *property, void *data)
+{
+	UNUSED_PARAMETER(props);
+	UNUSED_PARAMETER(property);
+	UNUSED_PARAMETER(data);
+
+	/* Returning true rebuilds the properties view, which regenerates the
+	 * snapshot text with the plug-in's current values. */
+	return true;
 }
 
 static const char *vst_name(void *unused)
@@ -401,12 +430,18 @@ static obs_properties_t *vst_properties(void *data)
 			obs_properties_t *params = obs_properties_create();
 			obs_properties_add_text(params, PARAM_INFO_SETTINGS, PARAMS_INFO_TEXT, OBS_TEXT_INFO);
 
+			std::string snapshot = PARAMS_SNAPSHOT_TEXT;
+			snapshot += "\n";
+			snapshot += getParamsSnapshot(vstPlugin);
+			obs_properties_add_text(params, PARAM_SNAPSHOT_SETTINGS, snapshot.c_str(),
+						OBS_TEXT_INFO);
+			obs_properties_add_button2(params, PARAM_REFRESH_SETTINGS, PARAMS_REFRESH_TEXT,
+						   vst_params_refresh_clicked, data);
+
 			int paramCount = vstPlugin->getParamCount();
 			for (int i = 0; i < paramCount; i++) {
 				char settingName[32];
 				snprintf(settingName, sizeof(settingName), PARAM_SETTING_PREFIX "%d", i);
-
-				std::string description = getParamDescription(vstPlugin, i);
 
 				obs_property_t *param;
 				if (vstPlugin->getParamIsSwitch(i)) {
@@ -414,8 +449,8 @@ static obs_properties_t *vst_properties(void *data)
 									vstPlugin->getParamName(i).c_str());
 				} else {
 					param = obs_properties_add_float_slider(params, settingName,
-										description.c_str(), 0.0, 1.0,
-										0.01);
+										vstPlugin->getParamName(i).c_str(),
+										0.0, 1.0, 0.01);
 				}
 				obs_property_set_modified_callback2(param, vst_param_changed, data);
 			}
