@@ -433,8 +433,7 @@ static obs_properties_t *vst_properties(void *data)
 			std::string snapshot = PARAMS_SNAPSHOT_TEXT;
 			snapshot += "\n";
 			snapshot += getParamsSnapshot(vstPlugin);
-			obs_properties_add_text(params, PARAM_SNAPSHOT_SETTINGS, snapshot.c_str(),
-						OBS_TEXT_INFO);
+			obs_properties_add_text(params, PARAM_SNAPSHOT_SETTINGS, snapshot.c_str(), OBS_TEXT_INFO);
 			obs_properties_add_button2(params, PARAM_REFRESH_SETTINGS, PARAMS_REFRESH_TEXT,
 						   vst_params_refresh_clicked, data);
 
@@ -449,13 +448,13 @@ static obs_properties_t *vst_properties(void *data)
 									vstPlugin->getParamName(i).c_str());
 				} else {
 					param = obs_properties_add_float_slider(params, settingName,
-										vstPlugin->getParamName(i).c_str(),
-										0.0, 1.0, 0.01);
+										vstPlugin->getParamName(i).c_str(), 0.0,
+										1.0, 0.01);
 				}
 				obs_property_set_modified_callback2(param, vst_param_changed, data);
 			}
-			obs_properties_add_group(props, PARAM_GROUP_SETTINGS, PARAMS_GROUP_TEXT,
-						 OBS_GROUP_NORMAL, params);
+			obs_properties_add_group(props, PARAM_GROUP_SETTINGS, PARAMS_GROUP_TEXT, OBS_GROUP_NORMAL,
+						 params);
 		}
 	}
 
