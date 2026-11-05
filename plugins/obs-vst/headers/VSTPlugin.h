@@ -94,6 +94,13 @@ public:
 	void setChunk(const std::string &data);
 	void setProgram(const int programNumber);
 	int getProgram();
+	int getParamCount();
+	std::string getParamName(int index);
+	std::string getParamDisplay(int index);
+	std::string getParamLabel(int index);
+	bool getParamIsSwitch(int index);
+	float getParamValue(int index);
+	void setParamValue(int index, float value);
 	void getSourceNames();
 	obs_audio_data *process(struct obs_audio_data *audio);
 	bool openInterfaceWhenActive = false;
