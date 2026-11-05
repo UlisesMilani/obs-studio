@@ -23,6 +23,13 @@ if(NOT DEFINED OBS_VERSION_OVERRIDE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git
   if(_obs_version_result EQUAL 0)
     string(REGEX REPLACE "([0-9]+)\\.([0-9]+)\\.([0-9]+).*" "\\1;\\2;\\3" _obs_version_canonical ${_obs_version})
   endif()
+
+  # Fork-specific fallback: without tags, git describe returns a commit hash,
+  # which is not a valid version. Pin a prototype version instead.
+  if(NOT _obs_version_canonical MATCHES "^[0-9]+;[0-9]+;[0-9]+$")
+    set(_obs_version "33.0.1-proto-vst")
+    set(_obs_version_canonical "33;0;1")
+  endif()
 elseif(DEFINED OBS_VERSION_OVERRIDE)
   if(OBS_VERSION_OVERRIDE MATCHES "([0-9]+)\\.([0-9]+)\\.([0-9]+).*")
     string(
