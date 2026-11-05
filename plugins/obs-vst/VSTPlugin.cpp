@@ -421,6 +421,90 @@ int VSTPlugin::getProgram()
 	return effect->dispatcher(effect, effGetProgram, 0, 0, NULL, 0.0f);
 }
 
+/* Parameter accessors are called from the UI thread only (properties
+ * callbacks and vst_update), the same context getChunk/setChunk already
+ * use for getParameter/setParameter, so they follow the same locking
+ * assumptions documented above for the effect pointer. */
+int VSTPlugin::getParamCount()
+{
+	return effect ? effect->numParams : 0;
+}
+
+std::string VSTPlugin::getParamName(int index)
+{
+	if (!effect || index < 0 || index >= effect->numParams) {
+		return "";
+	}
+
+	char name[64] = {0};
+	effect->dispatcher(effect, effGetParamName, index, 0, name, 0);
+	if (name[0]) {
+		return name;
+	}
+
+	return "Parameter " + std::to_string(index);
+}
+
+std::string VSTPlugin::getParamDisplay(int index)
+{
+	if (!effect || index < 0 || index >= effect->numParams) {
+		return "";
+	}
+
+	char display[64] = {0};
+	effect->dispatcher(effect, effGetParamDisplay, index, 0, display, 0);
+	return display;
+}
+
+std::string VSTPlugin::getParamLabel(int index)
+{
+	if (!effect || index < 0 || index >= effect->numParams) {
+		return "";
+	}
+
+	char label[64] = {0};
+	effect->dispatcher(effect, effGetParamLabel, index, 0, label, 0);
+	return label;
+}
+
+bool VSTPlugin::getParamIsSwitch(int index)
+{
+	if (!effect || index < 0 || index >= effect->numParams) {
+		return false;
+	}
+
+	VstParameterProperties props = {0};
+	if (effect->dispatcher(effect, effGetParameterProperties, index, 0, &props, 0) == 0) {
+		return false;
+	}
+
+	return (props.flags & kVstParameterIsSwitch) != 0;
+}
+
+float VSTPlugin::getParamValue(int index)
+{
+	if (!effect || index < 0 || index >= effect->numParams) {
+		return 0.0f;
+	}
+
+	return effect->getParameter(effect, index);
+}
+
+void VSTPlugin::setParamValue(int index, float value)
+{
+	if (!effect || index < 0 || index >= effect->numParams) {
+		return;
+	}
+
+	if (value < 0.0f) {
+		value = 0.0f;
+	} else if (value > 1.0f) {
+		value = 1.0f;
+	}
+
+	effect->setParameter(effect, index, value);
+}
+
 void VSTPlugin::getSourceNames()
 {
 	/* Only call inside the vst_filter_audio function! */
