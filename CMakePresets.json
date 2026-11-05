@@ -10,7 +10,7 @@
       "name": "environmentVars",
       "hidden": true,
       "cacheVariables": {
-        "OBS_VERSION_OVERRIDE": {"type": "STRING", "value": "33.0.1"},
+        "OBS_VERSION_OVERRIDE": {"type": "STRING", "value": "33.0.1-proto-vst"},
         "RESTREAM_CLIENTID": {"type": "STRING", "value": "$penv{RESTREAM_CLIENTID}"},
         "RESTREAM_HASH": {"type": "STRING", "value": "$penv{RESTREAM_HASH}"},
         "TWITCH_CLIENTID": {"type": "STRING", "value": "$penv{TWITCH_CLIENTID}"},
